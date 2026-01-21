@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "l1_observatory"
+version = "0.1.0"
+description = "L1 Observatory multispacecraft ingest + merge + plotting pipeline"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "matplotlib>=3.7",
+  "h5py>=3.9",
+  "cdasws>=1.8.10",
+]
+
+[project.scripts]
+l1obs = "l1obs.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["l1obs*"]
