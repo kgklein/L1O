@@ -13,6 +13,8 @@ dependencies = [
   "matplotlib>=3.7",
   "h5py>=3.9",
   "cdasws>=1.8.10",
+  "cdflib>=1.2.0",
+  "xarray>=2023.0.0",
 ]
 
 [project.scripts]

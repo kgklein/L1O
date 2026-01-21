@@ -2,7 +2,7 @@
 
 Fetch + unify solar wind data from L1 spacecraft for a selected hour.
 Outputs:
-- merged 1-second cadence dataset (HDF5)
+- merged 1-second cadence dataset (CDF)
 - stacked timeseries plot
 
 ## Install

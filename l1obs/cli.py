@@ -4,6 +4,9 @@ import argparse
 from pathlib import Path
 from typing import Dict
 
+import logging
+from l1obs.logging_utils import setup_logging
+
 import pandas as pd
 
 from l1obs.config import DATASETS, SPACECRAFT_COLORS, default_paths
@@ -32,7 +35,15 @@ def main() -> None:
     p.add_argument("--outdir", default=None, help="Output directory (default ./output)")
     p.add_argument("--cachedir", default=None, help="Cache directory (default ./cache)")
     p.add_argument("--force", action="store_true", help="Force re-download even if cached.")
+    p.add_argument("-v", "--verbose", action="store_true", help="Print pipeline progress.")
+    p.add_argument("-vv", action="store_true", help="Very verbose (debug-level).")
+
     args = p.parse_args()
+
+    setup_logging(verbose=args.verbose, very_verbose=args.vv)
+    log = logging.getLogger("l1obs.cli")
+    log.info("Starting l1obs")
+
 
     paths = default_paths()
     outdir = Path(args.outdir) if args.outdir else paths.output
@@ -43,11 +54,17 @@ def main() -> None:
     t0 = _parse_time(args.start)
     t1 = t0 + pd.Timedelta(hours=1)
 
+    log.info("Hour window: %s to %s", t0.isoformat(), t1.isoformat())
+    log.info("Cache dir: %s", str(cachedir))
+    log.info("Output dir: %s", str(outdir))
+
     frames_1s: Dict[str, pd.DataFrame] = {}
 
     for sc, spec in DATASETS.items():
         # Fetch MAG (if available) and PLASMA (if available), then assemble a per-spacecraft DF
         dfs = []
+
+        log.info("Processing spacecraft: %s", sc)
 
         if "mag" in spec:
             fr = fetch_cdaweb_dataset(spec["mag"], t0, t1, cachedir, force=args.force)
@@ -101,12 +118,17 @@ def main() -> None:
         frames_1s[sc] = df_sc_1s
 
     merged = merge_frames(frames_1s)
-
+    
     # Save merged HDF5
     stamp = t0.strftime("%Y%m%d_%HUT")
     h5path = outdir / f"L1_Observatory_{stamp}.h5"
     save_hdf5(merged, h5path)
 
+    log.info("Merging %d spacecraft frames", len(frames_1s))
+    log.info("Saving merged dataset: %s", str(h5path))
+    log.info("Saving plot: %s", str(plotpath))
+
+    
     # Plot
     plotpath = outdir / f"L1_Observatory_{stamp}_timeseries.png"
     plot_timeseries(
@@ -119,3 +141,5 @@ def main() -> None:
 
     print(f"Wrote: {h5path}")
     print(f"Wrote: {plotpath}")
+
+    log.info("Done.")

@@ -9,6 +9,9 @@ from cdasws import CdasWs
 
 from .variable_map import VAR_CANDIDATES, DATASET_LOGICAL_VARS
 
+import logging
+log = logging.getLogger("l1obs.fetch.cdaweb")
+
 
 @dataclass
 class FetchResult:
@@ -65,6 +68,7 @@ def fetch_cdaweb_dataset(
     cpath = _cache_path(cache_dir, dataset_id, start, end)
 
     if cpath.exists() and not force:
+        log.info("[%s] cache hit: %s", dataset_id, cpath.name)
         df = pd.read_parquet(cpath)
         # parquet won’t preserve index name reliably across all environments
         df.index = pd.to_datetime(df.index, utc=True)
@@ -75,7 +79,17 @@ def fetch_cdaweb_dataset(
     actual_vars = list(used.values())
 
     # Ask for pandas output
-    data = cdas.get_data(dataset_id, start.isoformat(), end.isoformat(), actual_vars, data_type="pandas")
+    # cdasws is happiest with naive Python datetimes in UTC
+    t1 = start.to_pydatetime().replace(tzinfo=None)
+    t2 = end.to_pydatetime().replace(tzinfo=None)
+
+    try:
+        # Newer/alternate signature: (dataset, variables, time1, time2, ...)
+        data = cdas.get_data(dataset_id, actual_vars, t1, t2, data_type="pandas")
+    except TypeError:
+        # Other signature: (dataset, time1, time2, variables, ...)
+        data = cdas.get_data(dataset_id, t1, t2, actual_vars, data_type="pandas")
+
     if data is None or "data" not in data or data["data"] is None:
         raise RuntimeError(f"[{dataset_id}] No data returned for {start} to {end}.")
 
@@ -84,6 +98,10 @@ def fetch_cdaweb_dataset(
         df.index = pd.to_datetime(df.index, utc=True)
     else:
         df.index = df.index.tz_convert("UTC")
+
+    # Debug: print columns once per dataset
+    print(f"[{dataset_id}] columns: {list(df.columns)[:30]}{' ...' if len(df.columns)>30 else ''}")
+
 
     # Save cache
     df.to_parquet(cpath)
