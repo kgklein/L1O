@@ -3,15 +3,36 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+
+@dataclass(frozen=True)
+class SpacecraftSpec:
+    """Project-wide metadata for a spacecraft."""
+
+    label: str
+    ssc_id: str
+
+
+# Canonical spacecraft registry. Dictionary order is the default display order.
+SPACECRAFT = {
+    "WIND": SpacecraftSpec(label="Wind", ssc_id="wind"),
+    "ACE": SpacecraftSpec(label="ACE", ssc_id="ace"),
+    "DSCOVR": SpacecraftSpec(label="DSCOVR", ssc_id="dscovr"),
+    "ADITYA-L1": SpacecraftSpec(label="Aditya-L1", ssc_id="adityal1"),
+    "IMAP": SpacecraftSpec(label="IMAP", ssc_id="imap"),
+    "SOLAR-1": SpacecraftSpec(label="SOLAR-1", ssc_id="solar1"),
+}
+
 # --- Stable, project-wide spacecraft colors (edit once, then never change) ---
 SPACECRAFT_COLORS = {
     "WIND":   "#1f77b4",  # blue
     "ACE":    "#d62728",  # red
     "DSCOVR": "#2ca02c",  # green
     "SOHO":   "#ff7f0e",  # orange
-    "IMAP":   "#0a0a0a",  # black (reserved)
+    "IMAP":   "#0a0a0a",  # black
     "SWFO":   "#17becf",  # teal (reserved)
-    "ADITYA": "#9467bd",  # purple (reserved)
+    "ADITYA": "#9467bd",  # legacy key
+    "ADITYA-L1": "#9467bd",  # purple
+    "SOLAR-1": "#8c564b",  # brown
 }
 
 # --- CDAWeb dataset IDs (public now) ---

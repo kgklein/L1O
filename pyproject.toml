@@ -14,6 +14,7 @@ dependencies = [
   "h5py>=3.9",
   "cdasws>=1.8.10",
   "cdflib>=1.2.0",
+  "sscws>=2.4",
   "xarray>=2023.0.0",
 ]
 
