@@ -38,6 +38,40 @@ configuration = get_positions_at_time(
 print(configuration.positions)
 ```
 
+## Shared magnetic-field retrieval
+
+`l1obs.fetch.magnetic.fetch_magnetic_field(spacecraft, start, end, cache_dir, force=False)`
+returns `FetchResult` containing native GSE fields and archive magnitude. Supply
+one of `Wind`, `ACE`, `DSCOVR`, `IMAP`, or `SOLAR-1`, pandas timestamps, and a
+`Path` cache directory. No resampling occurs. Naive requested times for SOLAR-1
+are interpreted as UTC; explicit UTC timestamps are recommended for all missions.
+
+```python
+from pathlib import Path
+import pandas as pd
+from l1obs.fetch.magnetic import fetch_magnetic_field
+
+result = fetch_magnetic_field(
+    "SOLAR-1",
+    pd.Timestamp("2026-04-22T00:00:00Z"),
+    pd.Timestamp("2026-04-22T00:10:00Z"),
+    Path("cache"),
+)
+print(result.df.head())
+```
+
+SOLAR-1 uses the NOAA/NCEI Space Weather Portal `/files` API to discover daily
+science-quality `sci_mag-l3_solar1` NetCDF files. Returned URLs are used directly;
+only overlapping days are downloaded, with the newest identifiable processing
+revision selected. Multi-day requests are combined and trimmed to `[start, end)`.
+Missing daily files raise an error listing the unavailable days.
+
+NOAA raw daily files and versioned normalized parquet results are cached under
+`cache_dir/ncei/sci_mag-l3_solar1/`. An interval cache hit needs no network;
+`force=True` refreshes discovery and downloads. The other four missions retain
+existing CDAWeb caching and fetching behavior. See [Data Products](data-products.md)
+for time decoding, fill values, and quality filtering.
+
 ## CDAWeb science data and magnetic access
 
 `l1obs.fetch.cdaweb.fetch_cdaweb_dataset(dataset_id, start, end, cache_dir, force=False)`
@@ -162,7 +196,7 @@ Both commands support `-v`/`--verbose`, `-vv`, and `--help`.
 magnetic time series beside three instantaneous-mesocenter geometry projections.
 It takes exactly six named entries, each containing separate `magnetic` and
 `positions` DataFrames with datetime indices. No retrieval occurs. L1O currently
-fetches magnetic data for four missions; other inputs must already be available
+fetches magnetic data for five missions; other inputs must already be available
 from your own sources.
 
 Given already-loaded `magnetic_by_spacecraft` and `positions_by_spacecraft`

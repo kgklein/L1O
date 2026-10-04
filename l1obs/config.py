@@ -35,7 +35,7 @@ SPACECRAFT_COLORS = {
     "SOLAR-1": "#8c564b",  # brown
 }
 
-# --- CDAWeb dataset IDs (public now) ---
+# --- Science products and optional provider (CDAWeb by default) ---
 DATASETS = {
     # ACE
     "ACE": {
@@ -55,6 +55,10 @@ DATASETS = {
     # IMAP (magnetic field only)
     "IMAP": {
         "mag": "IMAP_MAG_L2_NORM-GSE",  # 0.5-sec
+    },
+    "SOLAR-1": {
+        "mag": "sci_mag-l3_solar1",  # science-quality, 1-sec
+        "mag_provider": "ncei",
     },
     # SOHO (plasma only)
     "SOHO": {

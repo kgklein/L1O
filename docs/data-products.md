@@ -43,14 +43,14 @@ The configuration plot subtracts the available spacecraft centroid and displays
 three projections in units of `10^3` km. The returned position table itself
 retains absolute positions in the requested frame.
 
-## CDAWeb fetch result
+## Science fetch result
 
-`fetch_cdaweb_dataset` returns `FetchResult`:
+`fetch_magnetic_field` and `fetch_cdaweb_dataset` return the same `FetchResult`:
 
 | Attribute | Contents |
 | --- | --- |
 | `df` | Retrieved DataFrame; magnetic schema below |
-| `dataset_id` | Requested CDAWeb dataset identifier |
+| `dataset_id` | Requested CDAWeb dataset identifier or NOAA product identifier |
 | `used_vars` | Logical-to-archive variable mapping for a fresh fetch; `{"_cached": "true"}` for cache hits |
 
 ## Magnetic-field time series
@@ -61,8 +61,9 @@ retains absolute positions in the requested frame.
 | ACE | `AC_H3_MFI` | `Epoch` | `BGSEc` | `Magnitude` | 1 s |
 | DSCOVR | `DSCOVR_H0_MAG` | `Epoch1` | `B1GSE` | `B1F1` | 1 s |
 | IMAP | `IMAP_MAG_L2_NORM-GSE` | `epoch` | `b_gse` | `magnitude` | 0.5 s |
+| SOLAR-1 | `sci_mag-l3_solar1` (NOAA/NCEI science-quality) | `time_sec` | `b_gse_sec` | `b_gse_sphr_sec[:, 0]` | 1 s |
 
-All four magnetic fetches produce this common DataFrame layout:
+All five magnetic fetches produce this common DataFrame layout:
 
 | Field | Meaning | Units/frame |
 | --- | --- | --- |
@@ -89,6 +90,22 @@ Nonzero, missing, or invalid flags mask all four magnetic values at that
 timestamp. Both missions use the same metadata validity and quality-filtering
 path. The normalized DataFrame does not retain the flag column.
 
+SOLAR-1 comes from NOAA/NCEI rather than CDAWeb. Its Cartesian GSE columns
+come from the three components of `b_gse_sec`; `b_mag` is the first component
+of `b_gse_sphr_sec`, not a recomputed vector norm. NetCDF `_FillValue`,
+`missing_value`, `valid_min`, `valid_max`, and `valid_range` metadata are applied
+before normalization, with `-9999.0` as the fallback fill sentinel. No physical
+bounds are invented. Only valid `flags_summary == 0` is accepted; degraded (1),
+bad (2), missing, and invalid quality values mask all four fields. The separate
+`flags` bitmask does not impose an additional filter.
+
+`time_sec` uses microseconds since 1958-01-01, already corrected for leap seconds.
+The provider normalizes the descriptive units string for xarray's CF decoding;
+it does not apply another leap-second offset. Timestamps represent the start of
+each one-second averaging window. SOLAR-1 fetching uses `[start, end)` and retains
+invalid rows and timestamp gaps, without interpolating. Every requested day must
+have a discoverable daily file; missing days raise an error.
+
 ### Processing and CLI output
 
 The hourly CLI prefixes fields by spacecraft, for example `WIND_bx_gse` and
@@ -105,7 +122,8 @@ this policy on the interval `[t0, t1)`. Its default `preserve_nan_gaps=False`
 interpolates through NaNs and fills endpoints; the plasma CLI path uses that
 default.
 
-IMAP joins the same CLI magnetic pipeline with `IMAP_` column prefixes. Its
+SOLAR-1 joins the same pipeline with `SOLAR-1_` column prefixes.
+IMAP uses `IMAP_` column prefixes. Its
 half-second samples remain available through direct fetching; the CLI's
 1-second output does not retain every native sample.
 

@@ -13,8 +13,8 @@ python -m pip install -e .
 l1obs --help
 ```
 
-Retrieval examples need network access to NASA SSCWeb or CDAWeb and a date covered
-by the requested archive. CDAWeb requests reuse a local parquet cache unless
+Retrieval examples need network access to NASA SSCWeb/CDAWeb or NOAA/NCEI and a date covered
+by the requested archive. Science requests reuse a local parquet cache unless
 `force=True` is supplied. Python interfaces are imported from individual modules;
 there is no top-level convenience API.
 
@@ -48,16 +48,16 @@ requested spacecraft succeeds, the call raises `RuntimeError`.
 
 ## Native magnetic-field data
 
-Use the dataset-level interface; there is no separate mission-name magnetic
-wrapper. This example fetches Wind's native 3-second product:
+Use the shared mission-name interface. This example fetches Wind's native
+3-second product:
 
 ```python
 from pathlib import Path
 import pandas as pd
-from l1obs.fetch.cdaweb import fetch_cdaweb_dataset
+from l1obs.fetch.magnetic import fetch_magnetic_field
 
-result = fetch_cdaweb_dataset(
-    "WI_H0_MFI",
+result = fetch_magnetic_field(
+    "Wind",
     pd.Timestamp("2026-09-01T00:00:00Z"),
     pd.Timestamp("2026-09-01T00:10:00Z"),
     cache_dir=Path("cache"),
@@ -66,9 +66,15 @@ magnetic = result.df
 print(magnetic.head())
 ```
 
-For ACE use `AC_H3_MFI`; for DSCOVR use `DSCOVR_H0_MAG`. Both preserve native
-1-second samples. For IMAP use `IMAP_MAG_L2_NORM-GSE`, which preserves native
+For ACE or DSCOVR, pass their mission name; both preserve native 1-second
+samples. For IMAP, pass `"IMAP"`, which preserves native
 0.5-second samples and accepts only `quality_flags == 0` as good science data.
+Pass `"SOLAR-1"` to retrieve NOAA/NCEI science-quality `sci_mag-l3_solar1`
+with native 1-second timestamps and only `flags_summary == 0` accepted. Its
+interval is `[start, end)`; every requested day must have an available file.
+No archive guarantees coverage for a particular date. The original dataset-level
+`fetch_cdaweb_dataset` remains available for CDAWeb callers.
+
 The returned columns are `bx_gse`, `by_gse`, `bz_gse`, and
 `b_mag`, in nT, on a UTC index named `time`. Invalid samples remain as NaNs;
 fetching does not resample. See [Data Products](data-products.md).
