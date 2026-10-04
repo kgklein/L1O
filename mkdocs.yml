@@ -1,0 +1,20 @@
+site_name: L1O
+site_url: https://kgklein.github.io/L1O/
+repo_url: https://github.com/kgklein/L1O
+repo_name: kgklein/L1O
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Input and Output: io.md
+  - Data Products: data-products.md
+
+markdown_extensions:
+  - tables
+  - pymdownx.highlight
+  - pymdownx.superfences
