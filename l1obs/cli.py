@@ -13,7 +13,7 @@ from l1obs.config import DATASETS, SPACECRAFT_COLORS, default_paths
 from l1obs.fetch.cdaweb import fetch_cdaweb_dataset
 from l1obs.io.save import save_hdf5
 from l1obs.logging_utils import setup_logging
-from l1obs.proc.coords import ensure_b_rtn, ensure_v_rtn
+from l1obs.proc.coords import gse_to_pseudo_rtn, ensure_v_rtn
 from l1obs.proc.ephemeris import get_positions_at_time
 from l1obs.proc.merge import merge_frames
 from l1obs.proc.resample import resample_to_1s
@@ -32,6 +32,16 @@ def _parse_utc_time(value: str) -> pd.Timestamp:
     if timestamp.tz is None:
         return timestamp.tz_localize("UTC")
     return timestamp.tz_convert("UTC")
+
+
+def _magnetic_columns(df: pd.DataFrame, spacecraft: str) -> pd.DataFrame:
+    """Prefix normalized GSE data and retain the legacy pseudo-RTN interface."""
+    out = df.add_prefix(f"{spacecraft}_")
+    rtn = gse_to_pseudo_rtn(df[["bx_gse", "by_gse", "bz_gse"]].to_numpy())
+    for component, values in zip(["Br", "Bt", "Bn"], rtn.T):
+        out[f"{spacecraft}_{component}"] = values
+    out[f"{spacecraft}_Bmag"] = df["b_mag"]
+    return out
 
 
 def _run_timeseries(args: argparse.Namespace) -> int:
@@ -57,12 +67,10 @@ def _run_timeseries(args: argparse.Namespace) -> int:
             result = fetch_cdaweb_dataset(
                 spec["mag"], t0, t1, cachedir, force=args.force
             )
-            magnetic = result.df.copy()
-            for column in magnetic.columns:
-                if magnetic[column].dtype == "object":
-                    magnetic = ensure_b_rtn(magnetic, column, spacecraft)
-                    break
-            frames.append(magnetic)
+            magnetic = _magnetic_columns(result.df, spacecraft)
+            frames.append(resample_to_1s(
+                magnetic, t0, t1, preserve_nan_gaps=True
+            ))
 
         if "plasma" in spec:
             result = fetch_cdaweb_dataset(
@@ -85,7 +93,7 @@ def _run_timeseries(args: argparse.Namespace) -> int:
                         plasma[candidate], errors="coerce"
                     )
                     break
-            frames.append(plasma)
+            frames.append(resample_to_1s(plasma.sort_index(), t0, t1))
 
         if not frames:
             continue
@@ -93,9 +101,7 @@ def _run_timeseries(args: argparse.Namespace) -> int:
         spacecraft_frame = frames[0]
         for extra in frames[1:]:
             spacecraft_frame = spacecraft_frame.join(extra, how="outer")
-        frames_1s[spacecraft] = resample_to_1s(
-            spacecraft_frame.sort_index(), t0, t1
-        )
+        frames_1s[spacecraft] = spacecraft_frame.sort_index()
 
     merged = merge_frames(frames_1s)
     stamp = t0.strftime("%Y%m%d_%HUT")
