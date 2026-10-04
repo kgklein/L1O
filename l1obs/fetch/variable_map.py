@@ -1,5 +1,29 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class MagneticProduct:
+    time: str
+    vector: str
+    magnitude: str
+    cadence_seconds: int
+    quality: str | None = None
+
+    def variables(self) -> dict[str, str]:
+        variables = {"time": self.time, "B_GSE": self.vector, "B_MAG": self.magnitude}
+        if self.quality is not None:
+            variables["quality"] = self.quality
+        return variables
+
+
+MAGNETIC_PRODUCTS = {
+    "WI_H0_MFI": MagneticProduct("Epoch3", "B3GSE", "B3F1", 3),
+    "AC_H3_MFI": MagneticProduct("Epoch", "BGSEc", "Magnitude", 1),
+    "DSCOVR_H0_MAG": MagneticProduct("Epoch1", "B1GSE", "B1F1", 1, "FLAG1"),
+}
+
 # Candidate names (ordered by preference). We will pick the first that exists.
 # If none exist, we raise an error that prints available variables.
 
@@ -27,18 +51,19 @@ VAR_CANDIDATES = {
 }
 
 # Per dataset, what "logical variables" we want.
-# We keep this minimal and flexible: prefer RTN vectors, else GSE vectors.
+# Magnetic datasets use the exact product specifications above; plasma
+# datasets retain candidate-based resolution.
 DATASET_LOGICAL_VARS = {
     # ACE
-    "AC_H3_MFI": ["B_RTN", "B_GSE"],     # we can compute |B|
+    "AC_H3_MFI": ["B_GSE", "B_MAG"],
     "AC_H0_SWE": ["NP", "TP", "V_GSE"],  # often V is in GSE; we'll convert to pseudo-RTN later
 
     # Wind
-    "WI_H0_MFI": ["B_GSE", "B_RTN"],
+    "WI_H0_MFI": ["B_GSE", "B_MAG"],
     "WI_PM_3DP": ["NP", "TP", "V_GSE"],
 
     # DSCOVR
-    "DSCOVR_H0_MAG": ["B_GSE"],
+    "DSCOVR_H0_MAG": ["B_GSE", "B_MAG"],
     "DSCOVR_H1_FC":  ["NP", "TP", "V_GSE"],
 
     # SOHO

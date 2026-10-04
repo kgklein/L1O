@@ -32,7 +32,7 @@ one common UTC epoch, print their GSE positions, and display a configuration
 plot:
 
 ```bash
-l1obs positions --time 2026-09-01T00:00:00Z
+l1obs positions --time 2026-09-17T00:00:00Z
 ```
 
 Save the three-panel X-Y, X-Z, and Y-Z plot instead of displaying it:
