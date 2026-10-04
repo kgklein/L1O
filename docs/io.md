@@ -155,3 +155,103 @@ so successful execution is not guaranteed with the default installation.
 There is no magnetic-only CLI option; use the Python fetch call above.
 
 Both commands support `-v`/`--verbose`, `-vv`, and `--help`.
+
+## Six-spacecraft magnetic and geometry comparison
+
+`l1obs.viz.constellation.plot_six_spacecraft_B_and_geometry` plots six native
+magnetic time series beside three instantaneous-mesocenter geometry projections.
+It takes exactly six named entries, each containing separate `magnetic` and
+`positions` DataFrames with datetime indices. No retrieval occurs. L1O currently
+fetches magnetic data for four missions; other inputs must already be available
+from your own sources.
+
+Given already-loaded `magnetic_by_spacecraft` and `positions_by_spacecraft`
+dictionaries containing the same six names and GSE data:
+
+```python
+from pathlib import Path
+import matplotlib.pyplot as plt
+from l1obs.viz.constellation import plot_six_spacecraft_B_and_geometry
+
+datasets = {
+    name: {"magnetic": magnetic, "positions": positions_by_spacecraft[name]}
+    for name, magnetic in magnetic_by_spacecraft.items()
+}
+figure = plot_six_spacecraft_B_and_geometry(
+    datasets,
+    coordinate_system="GSE",
+    output_path=Path("output/constellation.png"),
+    save_pdf=True,
+)
+plt.close(figure)
+```
+
+The result is an open Matplotlib figure with nine axes. This example saves a
+300-dpi PNG and a sibling PDF. Without `output_path`, no file is written;
+`show=True` displays the figure. Output paths must end in `.png`.
+
+| Option | Behavior |
+| --- | --- |
+| `spacecraft_names` | Explicit ordering; must be a permutation of the six dataset names |
+| `time_range=(start, end)` | UTC display interval, including endpoint samples; otherwise the shared magnetic time coverage |
+| `B_components`, `position_components` | Three columns each; defaults are `bx_gse`, `by_gse`, `bz_gse` and `x_km`, `y_km`, `z_km` |
+| `B_units`, `position_units` | Input unit declarations and labels; default nT and km, with no conversion |
+| `coordinate_system` | Common frame declaration, required if any input lacks frame metadata |
+| `common_B_ylim` | Shared magnetic limits by default; `False` autoscales each panel |
+| `magnitude_column` | Default `None` computes the displayed vector norm; explicitly select `"b_mag"` for archive magnitude |
+| `magnetic_max_gap`, `position_max_gap` | Positive timedelta-like overrides, e.g. `"5s"` or `"5min"`; default three times each series' median spacing |
+| `colors` | Mapping from spacecraft names to colors; known names otherwise use repository colors |
+
+The plot checks `DataFrame.attrs["frame"]` and `attrs["coordinate_system"]`,
+when present, against the common frame declaration and each other. Unit metadata
+may be a scalar `attrs["units"]` or a mapping from column names to units. Missing
+metadata is supplied by your declarations; conflicting metadata raises an error.
+`_gse` field columns require GSE, and `_km` position columns require km. The plot
+does not transform frames or units. See [alignment and gap behavior](data-products.md#six-spacecraft-comparison-alignment).
+
+### CLI: `l1obs constellation`
+
+Use a local JSON manifest to call this plotter directly. The command reads files
+without contacting CDAWeb or SSCWeb. For example, save `inputs.json` containing
+exactly six unique spacecraft names:
+
+```json
+{
+  "Wind":      {"magnetic": "wind_mag.parquet",   "positions": "wind_pos.parquet"},
+  "ACE":       {"magnetic": "ace_mag.parquet",    "positions": "ace_pos.parquet"},
+  "DSCOVR":    {"magnetic": "dscovr_mag.parquet", "positions": "dscovr_pos.parquet"},
+  "Aditya-L1": {"magnetic": "aditya_mag.csv",     "positions": "aditya_pos.csv"},
+  "IMAP":      {"magnetic": "imap_mag.parquet",   "positions": "imap_pos.parquet"},
+  "SOLAR-1":   {"magnetic": "solar1_mag.csv",     "positions": "solar1_pos.csv"}
+}
+```
+
+These are example local filenames, not a claim that L1O can fetch magnetic data
+for all six missions. Supply your own loaded data for the other spacecraft.
+File paths are resolved relative to the manifest directory; absolute paths are
+also accepted. Manifest order determines the panel order.
+
+Parquet files must contain a datetime index or a `time` column. CSV files require
+a `time` column containing parseable timestamps. Magnetic and position files
+retain independent cadences. Existing DataFrames can be written with
+`frame.rename_axis("time").to_parquet(path)` or
+`frame.rename_axis("time").to_csv(path)`; the default field and position columns
+are listed above. CSV does not preserve frame/unit metadata, so declare the
+frame explicitly and supply the correct units.
+
+```bash
+l1obs constellation --manifest inputs.json --coordinate-system GSE \
+  --output output/constellation.png --pdf
+```
+
+The default output is `./output/constellation.png`. Add `--show` for interactive
+display. To limit the interval, supply both `--start` and `--end`; times are
+interpreted as UTC and are **not** floored to an hour.
+
+The command also accepts `--spacecraft-order` followed by all six names,
+`--b-components` and `--position-components` followed by three columns each,
+`--b-units`, `--position-units`, `--independent-b-ylim`, `--magnitude-column`,
+`--magnetic-max-gap`, and `--position-max-gap`. Frame and unit declarations do
+not perform conversions. The Python interface remains available for custom
+color overrides. Run `l1obs constellation --help` for all options, including
+`-v`/`--verbose` and `-vv`.

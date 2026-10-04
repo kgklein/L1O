@@ -113,3 +113,50 @@ Plasma data retain dataset-specific source columns, with selected prefixed
 columns added by the CLI when available. There is no universal normalized plasma
 product or standard temperature unit in the current implementation. See
 [Input and Output](io.md) for the plasma fetch limitation.
+
+## Six-spacecraft comparison alignment
+
+The [comparison plotting routine](io.md#six-spacecraft-magnetic-and-geometry-comparison)
+accepts separate magnetic and position DataFrames for each of exactly six
+spacecraft. Inputs are copied and sorted; datetime indices must be unique and
+contain no NaT. Naive times are interpreted as UTC. Numeric infinities are treated
+as missing data.
+
+The six magnetic panels retain their own native timestamps. Unlike the existing
+archive-magnitude pipeline, this plot computes `|B|` from the three displayed
+components by default. A missing component makes the computed magnitude missing.
+Explicit `magnitude_column="b_mag"` uses the archive scalar without filling its
+NaNs from the vector. Every panel uses the same magnetic quantity colors/styles;
+spacecraft label colors match the geometry tracks.
+
+By default the displayed window is the intersection of magnetic time coverages.
+An explicit `time_range` can override it, provided each spacecraft has magnetic
+samples in that interval. Magnetic data are never interpolated. NaNs break lines,
+and gaps longer than three times each input's median positive sample spacing
+receive a plotting-only break. Gap estimation uses the full input, before
+clipping; `magnetic_max_gap` and `position_max_gap` can override it with positive
+durations. These heuristics cannot identify every missing sample in sparse or
+irregular data; use explicit limits when the sampling characteristics are known.
+
+Geometry uses the sorted union of ephemeris timestamps within the shared valid
+position coverage and displayed window, including covered interval boundaries.
+XYZ positions are linearly interpolated in time only between consecutive valid
+records. Any invalid XYZ row or oversized timestamp interval splits an
+interpolation run; no extrapolation occurs. Single-record runs contribute only
+at their exact timestamps. Break samples are retained even when all spacecraft
+have a missing-timestamp gap, so geometry tracks do not bridge those gaps.
+
+At each common time, the mesocenter is the arithmetic mean of **all six** finite
+XYZ positions. If any spacecraft lacks a valid position, the complete geometry
+sample is masked for all spacecraft. The routine never substitutes a five-member
+center. It raises an error if there is no common coverage or no simultaneously
+valid geometry sample.
+
+The three geometry panels show `Δx–Δy`, `Δx–Δz`, and `Δy–Δz` relative to that
+instantaneous center, with equal aspect and common distance limits. Hollow
+circles indicate each track's first valid sample and filled triangles its last;
+the black plus marks the center. The actual geometry time span is stated on the
+figure and can be shorter than the magnetic window. Both columns require one
+common declared/metadata frame, with no coordinate transformation. Default
+geometry units are km; offsets are not divided into thousands of kilometres as
+in the separate configuration plot.

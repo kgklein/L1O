@@ -87,6 +87,20 @@ l1obs timeseries --help
 See [Input and Output](io.md) for export calls and the current limitations of the
 combined magnetic/plasma timeseries command and CDF export.
 
+## Compare six already-loaded spacecraft
+
+With a JSON manifest of six local magnetic/position file pairs, call the
+publication-quality comparison plotter directly:
+
+```bash
+l1obs constellation --manifest inputs.json --coordinate-system GSE \
+  --output output/constellation.png --pdf
+```
+
+This command reads parquet or CSV files and makes no downloads. See the
+[manifest example and options](io.md#cli-l1obs-constellation) for file layout,
+timestamps, and column requirements.
+
 ## View these docs locally
 
 Documentation tools are separate from the package dependencies. From the
