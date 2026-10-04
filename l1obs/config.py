@@ -60,6 +60,10 @@ DATASETS = {
         "mag": "sci_mag-l3_solar1",  # science-quality, 1-sec
         "mag_provider": "ncei",
     },
+    "ADITYA-L1": {
+        "mag": "L2_AL1_MAG",  # local PRADAN Level-2 files, 10-sec
+        "mag_provider": "pradan",
+    },
     # SOHO (plasma only)
     "SOHO": {
         "plasma": "SOHO_CELIAS-PM_30S",  # 30-sec proton monitor

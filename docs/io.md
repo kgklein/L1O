@@ -41,9 +41,10 @@ print(configuration.positions)
 ## Shared magnetic-field retrieval
 
 `l1obs.fetch.magnetic.fetch_magnetic_field(spacecraft, start, end, cache_dir, force=False)`
-returns `FetchResult` containing native GSE fields and archive magnitude. Supply
-one of `Wind`, `ACE`, `DSCOVR`, `IMAP`, or `SOLAR-1`, pandas timestamps, and a
-`Path` cache directory. No resampling occurs. Naive requested times for SOLAR-1
+returns `FetchResult` containing native GSE fields and magnitude (derived from
+the vector for Aditya-L1, archive-provided for the other missions). Supply one of
+`Wind`, `ACE`, `DSCOVR`, `IMAP`, `SOLAR-1`, or `Aditya-L1`, pandas timestamps, and a
+`Path` cache directory. No resampling occurs. Naive requested times for SOLAR-1 and Aditya-L1
 are interpreted as UTC; explicit UTC timestamps are recommended for all missions.
 
 ```python
@@ -71,6 +72,30 @@ NOAA raw daily files and versioned normalized parquet results are cached under
 `force=True` refreshes discovery and downloads. The other four missions retain
 existing CDAWeb caching and fetching behavior. See [Data Products](data-products.md)
 for time decoding, fill values, and quality filtering.
+
+### Aditya-L1 local inputs
+
+Aditya-L1 uses already-downloaded ISRO/ISSDC PRADAN science-ready Level-2 MAG
+files. Place `L2_AL1_MAG_YYYYMMDD_V00.nc` files directly in `cache_dir`; no new
+cache location or interval cache is created. This provider rereads source files
+on every call, so `force=True` has no additional effect. It never makes network
+requests, and missing daily files raise an error listing their filenames.
+
+```python
+aditya = fetch_magnetic_field(
+    "Aditya-L1",
+    pd.Timestamp("2026-09-20T00:00:00Z"),
+    pd.Timestamp("2026-09-21T00:00:00Z"),
+    Path("cache"),
+)
+print(aditya.df.head())
+```
+
+Requests spanning multiple days concatenate those local files and trim to
+`[start, end)`. Native cadence is 10 seconds. `b_mag` is derived from the masked
+GSE vector, and only `Quality_flag_10s_data == 1` is accepted. Automated PRADAN
+authentication, session handling, and downloading are not implemented. The
+hourly timeseries CLI uses the same provider and requires these files locally.
 
 ## CDAWeb science data and magnetic access
 
@@ -196,8 +221,8 @@ Both commands support `-v`/`--verbose`, `-vv`, and `--help`.
 magnetic time series beside three instantaneous-mesocenter geometry projections.
 It takes exactly six named entries, each containing separate `magnetic` and
 `positions` DataFrames with datetime indices. No retrieval occurs. L1O currently
-fetches magnetic data for five missions; other inputs must already be available
-from your own sources.
+supports magnetic data for all six missions; Aditya-L1 requires local Level-2
+files from PRADAN.
 
 Given already-loaded `magnetic_by_spacecraft` and `positions_by_spacecraft`
 dictionaries containing the same six names and GSE data:
@@ -232,7 +257,7 @@ The result is an open Matplotlib figure with nine axes. This example saves a
 | `B_units`, `position_units` | Input unit declarations and labels; default nT and km, with no conversion |
 | `coordinate_system` | Common frame declaration, required if any input lacks frame metadata |
 | `common_B_ylim` | Shared magnetic limits by default; `False` autoscales each panel |
-| `magnitude_column` | Default `None` computes the displayed vector norm; explicitly select `"b_mag"` for archive magnitude |
+| `magnitude_column` | Default `None` computes the displayed vector norm; explicitly select `"b_mag"` for the normalized magnitude (derived for Aditya-L1) |
 | `magnetic_max_gap`, `position_max_gap` | Positive timedelta-like overrides, e.g. `"5s"` or `"5min"`; default three times each series' median spacing |
 | `colors` | Mapping from spacecraft names to colors; known names otherwise use repository colors |
 
@@ -260,8 +285,8 @@ exactly six unique spacecraft names:
 }
 ```
 
-These are example local filenames, not a claim that L1O can fetch magnetic data
-for all six missions. Supply your own loaded data for the other spacecraft.
+These are example local filenames. Retrieve and save magnetic products through
+the shared API; Aditya-L1 requires already-downloaded local PRADAN files.
 File paths are resolved relative to the manifest directory; absolute paths are
 also accepted. Manifest order determines the panel order.
 

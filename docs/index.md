@@ -10,8 +10,11 @@ observations for analysis. The Python package and command-line tool are named
 | Capability | Spacecraft | Available interface |
 | --- | --- | --- |
 | SSCWeb ephemerides and common-time configurations | Wind, ACE, DSCOVR, Aditya-L1, IMAP, SOLAR-1 | Python retrieval and configuration plotting; `l1obs positions` |
-| Native-cadence GSE magnetic-field data | Wind, ACE, DSCOVR, IMAP, SOLAR-1 | Shared magnetic retrieval; CDAWeb for the first four, NOAA/NCEI science-quality MAG for SOLAR-1 |
+| Native-cadence GSE magnetic-field data | Wind, ACE, DSCOVR, IMAP, SOLAR-1, Aditya-L1 | Shared magnetic retrieval: CDAWeb, NOAA/NCEI, and local PRADAN Level-2 files |
 | Configured plasma datasets | ACE, Wind, DSCOVR, SOHO | Legacy CDAWeb fetch path and hourly timeseries command |
+
+Aditya-L1 reads already-downloaded ISRO/ISSDC PRADAN Level-2 MAG files; automated
+PRADAN authentication and downloading are not implemented.
 
 Configured spacecraft do not guarantee archive coverage for a particular date.
 Plasma retrieval currently expects a legacy CDAWeb response format; the complete

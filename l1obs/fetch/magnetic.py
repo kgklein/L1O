@@ -7,11 +7,12 @@ from l1obs.config import DATASETS
 from .cdaweb import fetch_cdaweb_dataset
 from .models import FetchResult
 from .ncei import fetch_ncei_product
+from .pradan import fetch_pradan_product
 
 
 def fetch_magnetic_field(spacecraft: str, start: pd.Timestamp, end: pd.Timestamp,
                          cache_dir: Path, force: bool = False) -> FetchResult:
-    """Fetch normalized GSE components and archive magnitude without resampling."""
+    """Fetch native GSE components and magnitude (derived for Aditya-L1)."""
     name = spacecraft.strip().upper()
     spec = DATASETS.get(name, {})
     if "mag" not in spec:
@@ -21,4 +22,6 @@ def fetch_magnetic_field(spacecraft: str, start: pd.Timestamp, end: pd.Timestamp
         return fetch_cdaweb_dataset(spec["mag"], start, end, cache_dir, force=force)
     if provider == "ncei":
         return fetch_ncei_product(spec["mag"], start, end, cache_dir, force=force)
+    if provider == "pradan":
+        return fetch_pradan_product(spec["mag"], start, end, cache_dir, force=force)
     raise ValueError(f"Unknown magnetic provider {provider!r} for {spacecraft!r}")
