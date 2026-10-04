@@ -1,5 +1,7 @@
-site_name: L1 Observatory
+site_name: L1O
+site_url: https://kgklein.github.io/L1O/
 repo_url: https://github.com/kgklein/L1O
+repo_name: kgklein/L1O
 
 theme:
   name: material
