@@ -14,7 +14,7 @@ l1obs --help
 ```
 
 Retrieval examples need network access to NASA SSCWeb/CDAWeb or NOAA/NCEI and a date covered
-by the requested archive. Science requests reuse a local parquet cache unless
+by the requested archive. CDAWeb and NOAA science requests reuse a local parquet cache unless
 `force=True` is supplied. Python interfaces are imported from individual modules;
 there is no top-level convenience API.
 
@@ -78,6 +78,26 @@ No archive guarantees coverage for a particular date. The original dataset-level
 The returned columns are `bx_gse`, `by_gse`, `bz_gse`, and
 `b_mag`, in nT, on a UTC index named `time`. Invalid samples remain as NaNs;
 fetching does not resample. See [Data Products](data-products.md).
+
+## Local Aditya-L1 magnetic data
+
+Place already-downloaded ISRO/ISSDC PRADAN Level-2 MAG files directly in the
+specified `cache_dir`, named `L2_AL1_MAG_YYYYMMDD_V00.nc`. Then use the same API:
+
+```python
+aditya = fetch_magnetic_field(
+    "Aditya-L1",
+    pd.Timestamp("2026-09-20T00:00:00Z"),
+    pd.Timestamp("2026-09-21T00:00:00Z"),
+    cache_dir=Path("cache"),
+)
+print(aditya.df.head())
+```
+
+Aditya-L1 reads local files only, preserves native 10-second samples, and derives
+`b_mag` from the masked GSE vector. Only `Quality_flag_10s_data == 1` is accepted.
+Requests use `[start, end)` and require a local file for every intersecting day.
+Automated PRADAN authentication and downloading are not implemented.
 
 ## Export and command options
 

@@ -50,7 +50,7 @@ retains absolute positions in the requested frame.
 | Attribute | Contents |
 | --- | --- |
 | `df` | Retrieved DataFrame; magnetic schema below |
-| `dataset_id` | Requested CDAWeb dataset identifier or NOAA product identifier |
+| `dataset_id` | Requested CDAWeb dataset, NOAA product, or local PRADAN product identifier |
 | `used_vars` | Logical-to-archive variable mapping for a fresh fetch; `{"_cached": "true"}` for cache hits |
 
 ## Magnetic-field time series
@@ -62,8 +62,9 @@ retains absolute positions in the requested frame.
 | DSCOVR | `DSCOVR_H0_MAG` | `Epoch1` | `B1GSE` | `B1F1` | 1 s |
 | IMAP | `IMAP_MAG_L2_NORM-GSE` | `epoch` | `b_gse` | `magnitude` | 0.5 s |
 | SOLAR-1 | `sci_mag-l3_solar1` (NOAA/NCEI science-quality) | `time_sec` | `b_gse_sec` | `b_gse_sphr_sec[:, 0]` | 1 s |
+| Aditya-L1 | `L2_AL1_MAG` (local PRADAN Level-2) | `time` | `Bx_gse`, `By_gse`, `Bz_gse` | Derived vector norm | 10 s |
 
-All five magnetic fetches produce this common DataFrame layout:
+All six magnetic fetches produce this common DataFrame layout:
 
 | Field | Meaning | Units/frame |
 | --- | --- | --- |
@@ -71,9 +72,10 @@ All five magnetic fetches produce this common DataFrame layout:
 | `bx_gse` | X magnetic-field component | nT, GSE |
 | `by_gse` | Y magnetic-field component | nT, GSE |
 | `bz_gse` | Z magnetic-field component | nT, GSE |
-| `b_mag` | Archive-provided field magnitude | nT |
+| `b_mag` | Archive magnitude; derived GSE vector norm for Aditya-L1 | nT |
 
-Magnitude is retained independently of the vector. In particular, Wind's `B3F1`
+For Wind, ACE, DSCOVR, IMAP, and SOLAR-1, magnitude is retained independently
+of the vector. In particular, Wind's `B3F1`
 is an average of magnitudes and may differ from the magnitude of its averaged
 vector. Native fetching does not interpolate, resample, or drop invalid records.
 
@@ -106,12 +108,27 @@ each one-second averaging window. SOLAR-1 fetching uses `[start, end)` and retai
 invalid rows and timestamp gaps, without interpolating. Every requested day must
 have a discoverable daily file; missing days raise an error.
 
+Aditya-L1 uses local ISRO/ISSDC PRADAN Level-2 MAG files. `time` is Unix seconds
+since 1970-01-01 UTC; native bins are 10 seconds. Components come from `Bx_gse`,
+`By_gse`, and `Bz_gse`, aligned by sample order and equal length because the file
+uses separate component dimension names. The global `Fill_value` (`-9999.0`),
+nonfinite values, and any variable-level fill/validity metadata are masked first.
+Only `Quality_flag_10s_data == 1` is good; all other values mask the entire vector.
+Then `b_mag = sqrt(bx_gse**2 + by_gse**2 + bz_gse**2)` is calculated. A missing
+component leaves the magnitude NaN; it is never filled with zero. Frame and unit
+attributes are GSE and nT, and `df.attrs["magnitude_source"]` identifies the derived
+magnitude. Error columns and spacecraft positions are not included in this product.
+
+Local files are combined and trimmed to `[start, end)` without resampling or
+dropping invalid magnetic records. Every requested day requires its V00 daily
+file. PRADAN authentication and automated downloading are not implemented.
+
 ### Processing and CLI output
 
 The hourly CLI prefixes fields by spacecraft, for example `WIND_bx_gse` and
 `WIND_b_mag`. It also retains `WIND_Br`, `WIND_Bt`, `WIND_Bn`, and `WIND_Bmag`
 for its existing plotting interface. The component conversion is pseudo-RTN:
-`Br = -bx_gse`, `Bt = -by_gse`, `Bn = bz_gse`; `Bmag` copies the archive magnitude.
+`Br = -bx_gse`, `Bt = -by_gse`, `Bn = bz_gse`; `Bmag` copies normalized `b_mag` (derived for Aditya-L1).
 This is a sign conversion rather than a full spacecraft-specific RTN transform.
 
 The CLI resamples magnetic data to a 1-second grid only within contiguous valid
@@ -122,7 +139,8 @@ this policy on the interval `[t0, t1)`. Its default `preserve_nan_gaps=False`
 interpolates through NaNs and fills endpoints; the plasma CLI path uses that
 default.
 
-SOLAR-1 joins the same pipeline with `SOLAR-1_` column prefixes.
+SOLAR-1 and Aditya-L1 join the same pipeline with `SOLAR-1_` and `ADITYA-L1_`
+column prefixes.
 IMAP uses `IMAP_` column prefixes. Its
 half-second samples remain available through direct fetching; the CLI's
 1-second output does not retain every native sample.
@@ -140,10 +158,9 @@ spacecraft. Inputs are copied and sorted; datetime indices must be unique and
 contain no NaT. Naive times are interpreted as UTC. Numeric infinities are treated
 as missing data.
 
-The six magnetic panels retain their own native timestamps. Unlike the existing
-archive-magnitude pipeline, this plot computes `|B|` from the three displayed
-components by default. A missing component makes the computed magnitude missing.
-Explicit `magnitude_column="b_mag"` uses the archive scalar without filling its
+The six magnetic panels retain their own native timestamps. This plot computes
+`|B|` from the three displayed components by default. A missing component makes the computed magnitude missing.
+Explicit `magnitude_column="b_mag"` uses the normalized magnitude (derived for Aditya-L1) without filling its
 NaNs from the vector. Every panel uses the same magnetic quantity colors/styles;
 spacecraft label colors match the geometry tracks.
 
