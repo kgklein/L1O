@@ -69,7 +69,8 @@ class MagneticTimeseriesTests(unittest.TestCase):
         datasets = {"WIND": {"mag": "WI_H0_MFI", "plasma": "WI_PM_3DP"},
                     "ACE": {"mag": "AC_H3_MFI"},
                     "DSCOVR": {"mag": "DSCOVR_H0_MAG"},
-                    "IMAP": {"mag": "IMAP_MAG_L2_NORM-GSE"}}
+                    "IMAP": {"mag": "IMAP_MAG_L2_NORM-GSE"},
+                    "SOLAR-1": {"mag": "sci_mag-l3_solar1", "mag_provider": "ncei"}}
         plasma = pd.DataFrame({"Np": [1, 4]}, index=[self.start, self.times[-1]])
         imap = self.frame.copy()
         imap.index = pd.date_range(self.start, periods=5, freq="500ms", name="time")
@@ -84,13 +85,15 @@ class MagneticTimeseriesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, \
                 patch("l1obs.cli.DATASETS", datasets), \
                 patch("l1obs.cli.fetch_cdaweb_dataset", side_effect=fetch), \
+                patch("l1obs.cli.fetch_magnetic_field",
+                      side_effect=lambda mission, *a, **k: fetch(datasets[mission]["mag"], *a, **k)), \
                 patch("l1obs.cli.save_hdf5") as save, \
                 patch("l1obs.cli.plot_timeseries") as plot:
             args = Namespace(start=self.start, outdir=directory, cachedir=directory, force=False)
             self.assertEqual(_run_timeseries(args), 0)
             merged = save.call_args.args[0]
             pd.testing.assert_frame_equal(plot.call_args.args[0], merged)
-            for mission in ("WIND", "ACE", "DSCOVR"):
+            for mission in ("WIND", "ACE", "DSCOVR", "SOLAR-1"):
                 self.assertEqual(merged[f"{mission}_Bmag"].iloc[0], 20)
                 self.assertTrue(merged[f"{mission}_Bmag"].iloc[4:9].isna().all())
                 self.assertTrue(merged[f"{mission}_Bmag"].iloc[13:].isna().all())

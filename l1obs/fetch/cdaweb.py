@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -10,16 +9,10 @@ from cdasws import CdasWs
 from cdasws.datarepresentation import DataRepresentation
 
 from .variable_map import VAR_CANDIDATES, DATASET_LOGICAL_VARS, MAGNETIC_PRODUCTS
+from .models import FetchResult
 
 import logging
 log = logging.getLogger("l1obs.fetch.cdaweb")
-
-
-@dataclass
-class FetchResult:
-    df: pd.DataFrame
-    dataset_id: str
-    used_vars: Dict[str, str]  # logical -> actual var name
 
 
 def _pick_var(available: List[str], candidates: List[str]) -> Optional[str]:

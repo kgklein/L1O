@@ -12,6 +12,7 @@ import pandas as pd
 
 from l1obs.config import DATASETS, SPACECRAFT_COLORS, default_paths
 from l1obs.fetch.cdaweb import fetch_cdaweb_dataset
+from l1obs.fetch.magnetic import fetch_magnetic_field
 from l1obs.io.save import save_hdf5
 from l1obs.logging_utils import setup_logging
 from l1obs.proc.coords import gse_to_pseudo_rtn, ensure_v_rtn
@@ -66,8 +67,8 @@ def _run_timeseries(args: argparse.Namespace) -> int:
         log.info("Processing spacecraft: %s", spacecraft)
 
         if "mag" in spec:
-            result = fetch_cdaweb_dataset(
-                spec["mag"], t0, t1, cachedir, force=args.force
+            result = fetch_magnetic_field(
+                spacecraft, t0, t1, cachedir, force=args.force
             )
             magnetic = _magnetic_columns(result.df, spacecraft)
             frames.append(resample_to_1s(
