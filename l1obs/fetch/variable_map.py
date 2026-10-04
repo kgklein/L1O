@@ -8,7 +8,7 @@ class MagneticProduct:
     time: str
     vector: str
     magnitude: str
-    cadence_seconds: int
+    cadence_seconds: float
     quality: str | None = None
 
     def variables(self) -> dict[str, str]:
@@ -22,6 +22,7 @@ MAGNETIC_PRODUCTS = {
     "WI_H0_MFI": MagneticProduct("Epoch3", "B3GSE", "B3F1", 3),
     "AC_H3_MFI": MagneticProduct("Epoch", "BGSEc", "Magnitude", 1),
     "DSCOVR_H0_MAG": MagneticProduct("Epoch1", "B1GSE", "B1F1", 1, "FLAG1"),
+    "IMAP_MAG_L2_NORM-GSE": MagneticProduct("epoch", "b_gse", "magnitude", 0.5, "quality_flags"),
 }
 
 # Candidate names (ordered by preference). We will pick the first that exists.
@@ -65,6 +66,9 @@ DATASET_LOGICAL_VARS = {
     # DSCOVR
     "DSCOVR_H0_MAG": ["B_GSE", "B_MAG"],
     "DSCOVR_H1_FC":  ["NP", "TP", "V_GSE"],
+
+    # IMAP
+    "IMAP_MAG_L2_NORM-GSE": ["B_GSE", "B_MAG"],
 
     # SOHO
     "SOHO_CELIAS-PM_30S": ["NP", "TP", "V_GSE"],  # may not have all; we’ll handle gracefully

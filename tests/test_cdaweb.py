@@ -32,7 +32,7 @@ class MagneticFetchTests(unittest.TestCase):
         vector = np.asarray([[1, 2, 3], [4, 5, 6], [7, 8, 9]]
                             if vector is None else vector, dtype=dtype)
         magnitude = np.asarray([10, 20, 30] if magnitude is None else magnitude, dtype=dtype)
-        time = pd.date_range(self.start, periods=len(vector), freq=f"{spec.cadence_seconds}s")
+        time = pd.date_range(self.start, periods=len(vector), freq=pd.Timedelta(seconds=spec.cadence_seconds))
         attrs = {"FILLVAL": dtype(-1e31), "VALIDMIN": -100.0, "VALIDMAX": 100.0}
         variables = {
             spec.vector: xr.DataArray(vector, dims=(spec.time, "component"), attrs=attrs.copy()),
@@ -55,6 +55,7 @@ class MagneticFetchTests(unittest.TestCase):
             "WIND": ("WI_H0_MFI", "Epoch3", "B3GSE", "B3F1", 3, None),
             "ACE": ("AC_H3_MFI", "Epoch", "BGSEc", "Magnitude", 1, None),
             "DSCOVR": ("DSCOVR_H0_MAG", "Epoch1", "B1GSE", "B1F1", 1, "FLAG1"),
+            "IMAP": ("IMAP_MAG_L2_NORM-GSE", "epoch", "b_gse", "magnitude", 0.5, "quality_flags"),
         }
         self.assertEqual(set(MAGNETIC_PRODUCTS), {item[0] for item in expected.values()})
         for mission, (dataset, time, vector, magnitude, cadence, quality) in expected.items():
@@ -73,7 +74,7 @@ class MagneticFetchTests(unittest.TestCase):
                 self.assertEqual(result.df.index.name, "time")
                 self.assertEqual(str(result.df.index.tz), "UTC")
                 self.assertEqual(result.df.index.tolist(),
-                                 pd.date_range(self.start, periods=3, freq=f"{cadence}s").tolist())
+                                 pd.date_range(self.start, periods=3, freq=pd.Timedelta(seconds=cadence)).tolist())
                 np.testing.assert_array_equal(result.df.iloc[0], [1, 2, 3, 10])
                 self.assertNotEqual(result.df.b_mag.iloc[0], np.linalg.norm([1, 2, 3]))
                 requested = [vector, magnitude] + ([quality] if quality else [])
@@ -126,6 +127,56 @@ class MagneticFetchTests(unittest.TestCase):
         self.assertTrue(df.iloc[1:].isna().all().all())
         self.assertEqual(len(df), 5)
 
+    def test_imap_nonzero_missing_and_fill_flags_mask_all_fields(self):
+        dataset = "IMAP_MAG_L2_NORM-GSE"
+        data = self.product(dataset, vector=[[1, 2, 3]] * 6,
+                            magnitude=[10] * 6, flags=[0, 1, 2, np.nan, -999, 65536])
+        df = self.fetch(dataset, data).df
+        np.testing.assert_array_equal(df.iloc[0], [1, 2, 3, 10])
+        self.assertTrue(df.iloc[1:].isna().all().all())
+        self.assertEqual(len(df), 6)
+        self.assertEqual(df.index[1] - df.index[0], pd.Timedelta(milliseconds=500))
+
+    def test_imap_metadata_masks_fills_and_component_and_scalar_bounds(self):
+        dataset = "IMAP_MAG_L2_NORM-GSE"
+        for dtype in (np.float32, np.float64):
+            with self.subTest(dtype=dtype):
+                data = self.product(dataset,
+                                    vector=[[-10, -20, -30], [10, 20, 30],
+                                            [-11, 21, -1e31], [1, 2, 3], [4, 5, 6]],
+                                    magnitude=[0, 100, -1e31, -1, 101], dtype=dtype)
+                data.b_gse.attrs.update(VALIDMIN=[-10, -20, -30], VALIDMAX=[10, 20, 30])
+                data.magnitude.attrs.update(VALIDMIN=0, VALIDMAX=100)
+                df = self.fetch(dataset, data, force=True).df
+                np.testing.assert_array_equal(df.iloc[0], [-10, -20, -30, 0])
+                np.testing.assert_array_equal(df.iloc[1], [10, 20, 30, 100])
+                self.assertTrue(df.iloc[2].isna().all())
+                self.assertTrue(df.b_mag.iloc[3:].isna().all())
+                np.testing.assert_array_equal(df.iloc[3, :3], [1, 2, 3])
+
+    def test_imap_fill_metadata_masks_values_without_validity_bounds(self):
+        dataset = "IMAP_MAG_L2_NORM-GSE"
+        data = self.product(dataset, vector=[[1, -1e31, 3], [4, 5, 6], [7, 8, 9]],
+                            magnitude=[10, -1e31, 30], dtype=np.float32)
+        for name in ["b_gse", "magnitude"]:
+            data[name].attrs = {"FILLVAL": -1e31}
+        with self.assertLogs("l1obs.fetch.cdaweb", level="WARNING"):
+            df = self.fetch(dataset, data).df
+        self.assertTrue(np.isnan(df.by_gse.iloc[0]))
+        self.assertTrue(np.isnan(df.b_mag.iloc[1]))
+        self.assertEqual(df.bx_gse.iloc[0], 1)
+
+    def test_imap_missing_epoch_or_quality_and_malformed_vector_raise(self):
+        dataset = "IMAP_MAG_L2_NORM-GSE"
+        for name in ("epoch", "quality_flags"):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(RuntimeError, f"Missing required variables: {name}"):
+                    self.fetch(dataset, self.product(dataset).drop_vars(name))
+        data = self.product(dataset)
+        data["b_gse"] = xr.DataArray(np.ones((3, 2)), dims=("epoch", "bad_component"))
+        with self.assertRaisesRegex(RuntimeError, "shape"):
+            self.fetch(dataset, data)
+
     def test_component_fill_attributes_and_scalar_lower_bound(self):
         data = self.product("WI_H0_MFI", vector=[[-999, 2, 3], [4, -998, 6], [7, 8, -997]],
                             magnitude=[-1, 0, 100])
@@ -164,13 +215,15 @@ class MagneticFetchTests(unittest.TestCase):
         pd.testing.assert_frame_equal(cached.df, result.df, check_freq=False)
 
     def test_cache_round_trip_is_offline_and_force_refetches(self):
-        first = self.fetch()
-        self.client_class.reset_mock()
-        cached = fetch_cdaweb_dataset("WI_H0_MFI", self.start, self.end, self.cache)
-        self.client_class.assert_not_called()
-        pd.testing.assert_frame_equal(cached.df, first.df)
-        self.fetch(force=True)
-        self.client_class.assert_called_once()
+        for dataset in ("WI_H0_MFI", "IMAP_MAG_L2_NORM-GSE"):
+            with self.subTest(dataset=dataset):
+                first = self.fetch(dataset)
+                self.client_class.reset_mock()
+                cached = fetch_cdaweb_dataset(dataset, self.start, self.end, self.cache)
+                self.client_class.assert_not_called()
+                pd.testing.assert_frame_equal(cached.df, first.df)
+                self.fetch(dataset, force=True)
+                self.client_class.assert_called_once()
 
     def test_legacy_magnetic_cache_is_ignored_and_plasma_name_is_unchanged(self):
         stamp = "20260901T000000_20260901T000020"

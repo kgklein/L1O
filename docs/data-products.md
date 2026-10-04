@@ -60,8 +60,9 @@ retains absolute positions in the requested frame.
 | Wind | `WI_H0_MFI` | `Epoch3` | `B3GSE` | `B3F1` | 3 s |
 | ACE | `AC_H3_MFI` | `Epoch` | `BGSEc` | `Magnitude` | 1 s |
 | DSCOVR | `DSCOVR_H0_MAG` | `Epoch1` | `B1GSE` | `B1F1` | 1 s |
+| IMAP | `IMAP_MAG_L2_NORM-GSE` | `epoch` | `b_gse` | `magnitude` | 0.5 s |
 
-All three magnetic fetches produce this common DataFrame layout:
+All four magnetic fetches produce this common DataFrame layout:
 
 | Field | Meaning | Units/frame |
 | --- | --- | --- |
@@ -83,9 +84,10 @@ filtered independently. If `FILLVAL` is absent, the conventional `-1e31` sentine
 is recognized at float32/float64 precision. Missing validity bounds produce a
 warning and are not replaced with physical thresholds.
 
-DSCOVR additionally requires `FLAG1 == 0`. Nonzero, missing, or invalid flags
-mask all four magnetic values at that timestamp. The normalized DataFrame does
-not retain the flag column.
+DSCOVR additionally requires `FLAG1 == 0`; IMAP requires `quality_flags == 0`.
+Nonzero, missing, or invalid flags mask all four magnetic values at that
+timestamp. Both missions use the same metadata validity and quality-filtering
+path. The normalized DataFrame does not retain the flag column.
 
 ### Processing and CLI output
 
@@ -102,6 +104,10 @@ NaN, and endpoints are not extrapolated. The public processing call
 this policy on the interval `[t0, t1)`. Its default `preserve_nan_gaps=False`
 interpolates through NaNs and fills endpoints; the plasma CLI path uses that
 default.
+
+IMAP joins the same CLI magnetic pipeline with `IMAP_` column prefixes. Its
+half-second samples remain available through direct fetching; the CLI's
+1-second output does not retain every native sample.
 
 Plasma data retain dataset-specific source columns, with selected prefixed
 columns added by the CLI when available. There is no universal normalized plasma

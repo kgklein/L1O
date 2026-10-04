@@ -67,7 +67,9 @@ print(magnetic.head())
 ```
 
 For ACE use `AC_H3_MFI`; for DSCOVR use `DSCOVR_H0_MAG`. Both preserve native
-1-second samples. The returned columns are `bx_gse`, `by_gse`, `bz_gse`, and
+1-second samples. For IMAP use `IMAP_MAG_L2_NORM-GSE`, which preserves native
+0.5-second samples and accepts only `quality_flags == 0` as good science data.
+The returned columns are `bx_gse`, `by_gse`, `bz_gse`, and
 `b_mag`, in nT, on a UTC index named `time`. Invalid samples remain as NaNs;
 fetching does not resample. See [Data Products](data-products.md).
 

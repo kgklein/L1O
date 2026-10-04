@@ -52,6 +52,10 @@ DATASETS = {
         "mag":    "DSCOVR_H0_MAG",  # 1-sec
         "plasma": "DSCOVR_H1_FC",   # 1-min
     },
+    # IMAP (magnetic field only)
+    "IMAP": {
+        "mag": "IMAP_MAG_L2_NORM-GSE",  # 0.5-sec
+    },
     # SOHO (plasma only)
     "SOHO": {
         "plasma": "SOHO_CELIAS-PM_30S",  # 30-sec proton monitor

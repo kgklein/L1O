@@ -46,8 +46,12 @@ directory. Returns `FetchResult` with `df`, `dataset_id`, and `used_vars`. Reque
 reuse parquet caches; `force=True` downloads again. Magnetic caches are versioned
 to exclude older, unnormalized products.
 
-Magnetic access uses this same call with `WI_H0_MFI`, `AC_H3_MFI`, or
-`DSCOVR_H0_MAG`; fetching preserves native cadence and returns normalized fields.
+Magnetic access uses this same call with `WI_H0_MFI`, `AC_H3_MFI`,
+`DSCOVR_H0_MAG`, or `IMAP_MAG_L2_NORM-GSE`; fetching preserves native cadence
+and returns normalized fields. IMAP retains 0.5-second samples, reads the
+lowercase archive time variable `epoch`, and masks samples whose
+`quality_flags` are nonzero, missing, or invalid. Its archive-provided
+`magnitude` becomes `b_mag`.
 
 ```python
 from pathlib import Path

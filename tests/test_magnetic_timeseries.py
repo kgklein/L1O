@@ -68,11 +68,17 @@ class MagneticTimeseriesTests(unittest.TestCase):
     def test_cli_resamples_magnetic_and_plasma_separately_and_plots_archive_values(self):
         datasets = {"WIND": {"mag": "WI_H0_MFI", "plasma": "WI_PM_3DP"},
                     "ACE": {"mag": "AC_H3_MFI"},
-                    "DSCOVR": {"mag": "DSCOVR_H0_MAG"}}
+                    "DSCOVR": {"mag": "DSCOVR_H0_MAG"},
+                    "IMAP": {"mag": "IMAP_MAG_L2_NORM-GSE"}}
         plasma = pd.DataFrame({"Np": [1, 4]}, index=[self.start, self.times[-1]])
+        imap = self.frame.copy()
+        imap.index = pd.date_range(self.start, periods=5, freq="500ms", name="time")
 
         def fetch(dataset, *args, **kwargs):
-            frame = plasma if dataset == "WI_PM_3DP" else self.frame
+            if dataset == "IMAP_MAG_L2_NORM-GSE":
+                frame = imap
+            else:
+                frame = plasma if dataset == "WI_PM_3DP" else self.frame
             return FetchResult(frame, dataset, {})
 
         with tempfile.TemporaryDirectory() as directory, \
@@ -84,12 +90,16 @@ class MagneticTimeseriesTests(unittest.TestCase):
             self.assertEqual(_run_timeseries(args), 0)
             merged = save.call_args.args[0]
             pd.testing.assert_frame_equal(plot.call_args.args[0], merged)
-            for mission in datasets:
+            for mission in ("WIND", "ACE", "DSCOVR"):
                 self.assertEqual(merged[f"{mission}_Bmag"].iloc[0], 20)
                 self.assertTrue(merged[f"{mission}_Bmag"].iloc[4:9].isna().all())
                 self.assertTrue(merged[f"{mission}_Bmag"].iloc[13:].isna().all())
             self.assertFalse(merged.WIND_Np.isna().any())
             self.assertEqual(merged.WIND_Np.iloc[6], 2.5)
+            self.assertEqual(merged.IMAP_Bmag.iloc[0], 20)
+            self.assertTrue(np.isnan(merged.IMAP_Bmag.iloc[1]))
+            self.assertEqual(merged.IMAP_Bmag.iloc[2], 60)
+            self.assertTrue(merged.IMAP_Bmag.iloc[3:].isna().all())
             self.assertEqual(len(merged), 3600)
 
 
