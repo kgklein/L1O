@@ -35,7 +35,8 @@ def _discover(start: pd.Timestamp, end: pd.Timestamp) -> list[dict]:
     for day in pd.date_range(start.normalize(), (end - pd.Timedelta(nanoseconds=1)).normalize(), freq="D"):
         next_day = day + pd.Timedelta(days=1)
         query = urlencode({"prod": PRODUCT, "sat": "SOLAR-1",
-                           "start_time": day.isoformat(), "end_time": next_day.isoformat(),
+                           "start_time": day.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                           "end_time": next_day.strftime("%Y-%m-%dT%H:%M:%SZ"),
                            "limit": 1000})
         with urlopen(f"{API_URL}?{query}", timeout=60) as response:
             payload = json.load(response)

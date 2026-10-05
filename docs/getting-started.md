@@ -127,6 +127,40 @@ This command reads parquet or CSV files and makes no downloads. See the
 [manifest example and options](io.md#cli-l1obs-constellation) for file layout,
 timestamps, and column requirements.
 
+## Prepare a day for the constellation command
+
+From the repository root with L1O installed, place the day's local Aditya-L1
+Level-2 MAG file in `cache/` and run:
+
+```bash
+python scripts/prepare_constellation.py --date 2026-04-01
+```
+
+The script fetches the other five magnetic products and SSCWeb GSE ephemerides.
+It reads Aditya-L1 positions from the same local Level-2 file. Magnetic series
+retain their native cadence, NaNs, and normalized magnitude. Positions use km;
+SSCWeb requests include five minutes of padding for boundary interpolation.
+
+On success, twelve parquet tables and `inputs.json` are written to
+`cache/constellation/2026-04-01/`. Plot them with:
+
+```bash
+l1obs constellation --manifest cache/constellation/2026-04-01/inputs.json \
+  --start 2026-04-01T00:00:00Z --end 2026-04-02T00:00:00Z \
+  --coordinate-system GSE --magnitude-column b_mag \
+  --output output/constellation_2026-04-01.png --pdf
+```
+
+`--magnitude-column b_mag` retains archive magnitudes for the five remote
+missions and the derived magnitude for Aditya-L1. Omit it to compute all
+magnitudes from the displayed vectors instead.
+
+The script accepts `--cache-dir`, `--output-dir`, and `--force`. Completed tables
+are reused on reruns, allowing preparation to resume after an archive failure.
+A new manifest is written only after all six pairs succeed. Archive coverage and
+SSCWeb mission availability may prevent completion; failures are reported without
+substituting another spacecraft or inventing measurements.
+
 ## View these docs locally
 
 Documentation tools are separate from the package dependencies. From the

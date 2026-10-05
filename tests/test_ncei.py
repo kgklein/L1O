@@ -73,7 +73,7 @@ class NceiTests(unittest.TestCase):
             fetch_magnetic_field("solar-1", self.start, self.start + pd.Timedelta(seconds=1), self.root)
             self.assertEqual(fetch.call_args.args[0], ncei.PRODUCT)
         with self.assertRaisesRegex(ValueError, "No magnetic"):
-            fetch_magnetic_field("Aditya-L1", self.start, self.start, self.root)
+            fetch_magnetic_field("SOHO", self.start, self.start, self.root)
 
     def test_native_normalization_archive_magnitude_and_summary_quality(self):
         ds = self.dataset()
@@ -140,6 +140,8 @@ class NceiTests(unittest.TestCase):
         query = parse_qs(urlparse(self.open.call_args.args[0]).query)
         self.assertEqual(query["prod"], [ncei.PRODUCT])
         self.assertEqual(query["sat"], ["SOLAR-1"])
+        self.assertEqual(query["start_time"], ["2026-04-22T00:00:00Z"])
+        self.assertEqual(query["end_time"], ["2026-04-23T00:00:00Z"])
         self.assertEqual(len(self.open.call_args_list), 1)
 
     def test_missing_days_and_ambiguous_revisions(self):
