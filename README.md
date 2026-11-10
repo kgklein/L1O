@@ -42,3 +42,10 @@ l1obs positions \
   --time 2026-09-01T00:00:00Z \
   --output l1_positions.png
 ```
+
+## Shock timing
+
+Inspect native magnetic profiles and fit explicitly accepted multispacecraft
+arrivals with the offline `l1obs shock inspect` and `l1obs shock fit` workflows.
+See [the scientific methodology and event configuration guide](docs/shock-timing.md).
+The April 1, 2026 example contains no accepted crossing times.
