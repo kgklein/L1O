@@ -1,0 +1,71 @@
+{
+  "event_id": "20260401_shock",
+  "start": "2026-04-01T10:45:00Z",
+  "end": "2026-04-01T12:15:00Z",
+  "spacecraft": [
+    "Wind",
+    "ACE",
+    "DSCOVR",
+    "Aditya-L1",
+    "IMAP",
+    "SOLAR-1"
+  ],
+  "search_windows": {
+    "Wind": [
+      "2026-04-01T11:10:00Z",
+      "2026-04-01T11:40:00Z"
+    ],
+    "ACE": [
+      "2026-04-01T11:10:00Z",
+      "2026-04-01T11:40:00Z"
+    ],
+    "DSCOVR": [
+      "2026-04-01T11:10:00Z",
+      "2026-04-01T11:40:00Z"
+    ],
+    "Aditya-L1": [
+      "2026-04-01T11:10:00Z",
+      "2026-04-01T11:40:00Z"
+    ],
+    "IMAP": [
+      "2026-04-01T11:10:00Z",
+      "2026-04-01T11:40:00Z"
+    ],
+    "SOLAR-1": [
+      "2026-04-01T11:10:00Z",
+      "2026-04-01T11:40:00Z"
+    ]
+  },
+  "arrivals": {},
+  "inputs": {
+    "manifest": "../../cache/constellation/2026-04-01/inputs.json",
+    "native_cadence": true,
+    "quality_masks_applied": true,
+    "coordinate_system": "GSE",
+    "magnetic_units": "nT",
+    "position_units": "km",
+    "ephemeris_max_gap_s": 900,
+    "spacecraft_metadata": {
+      "SOLAR-1": {
+        "timestamp_offset_s": 0.5,
+        "timestamp_convention": "time_sec labels start of 1 s average; proposal uses bin center (+0.5 s); source NetCDF comments"
+      }
+    }
+  },
+  "detection": {
+    "window_s": 60,
+    "min_jump_nt": 0.5,
+    "min_significance": 3,
+    "ambiguity_ratio": 0.8
+  },
+  "fit": {
+    "method": "auto",
+    "condition_limit": 1000000
+  },
+  "monte_carlo": {
+    "samples": 2000,
+    "seed": 20260401,
+    "recompute_positions": true
+  },
+  "output_dir": "../../output/shocks/20260401_shock"
+}

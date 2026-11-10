@@ -13,6 +13,7 @@ nav:
   - Getting Started: getting-started.md
   - Input and Output: io.md
   - Data Products: data-products.md
+  - Shock Timing: shock-timing.md
 
 markdown_extensions:
   - tables

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import sys
 from pathlib import Path
@@ -14,6 +13,8 @@ from l1obs.config import DATASETS, SPACECRAFT_COLORS, default_paths
 from l1obs.fetch.cdaweb import fetch_cdaweb_dataset
 from l1obs.fetch.magnetic import fetch_magnetic_field
 from l1obs.io.save import save_hdf5
+# Retain the existing import interface for callers and tests.
+from l1obs.io.manifest import load_manifest as _load_constellation_manifest
 from l1obs.logging_utils import setup_logging
 from l1obs.proc.coords import gse_to_pseudo_rtn, ensure_v_rtn
 from l1obs.proc.ephemeris import get_positions_at_time
@@ -164,52 +165,6 @@ def _positive_gap(value: str) -> pd.Timedelta:
     return gap
 
 
-def _unique_json_object(pairs):
-    result = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError(f"Duplicate manifest key: {key!r}")
-        result[key] = value
-    return result
-
-
-def _load_constellation_manifest(manifest_path: Path) -> dict:
-    """Load six pairs of local tables, resolving paths relative to the manifest."""
-    try:
-        manifest = json.loads(manifest_path.read_text(), object_pairs_hook=_unique_json_object)
-    except (OSError, ValueError) as exc:
-        raise RuntimeError(f"Cannot read constellation manifest {manifest_path}: {exc}") from exc
-    if not isinstance(manifest, dict) or len(manifest) != 6:
-        raise RuntimeError("The constellation manifest must map exactly six spacecraft names to file pairs.")
-    datasets = {}
-    for name, entry in manifest.items():
-        if not name.strip() or not isinstance(entry, dict) or set(entry) != {"magnetic", "positions"}:
-            raise RuntimeError(f"Manifest entry {name!r} requires magnetic and positions file paths.")
-        datasets[name] = {}
-        for kind, filename in entry.items():
-            if not isinstance(filename, str) or not filename.strip():
-                raise RuntimeError(f"{name} {kind} file path must be a nonempty string.")
-            path = Path(filename)
-            if not path.is_absolute():
-                path = manifest_path.parent / path
-            try:
-                if path.suffix.lower() == ".parquet":
-                    frame = pd.read_parquet(path)
-                elif path.suffix.lower() == ".csv":
-                    frame = pd.read_csv(path)
-                else:
-                    raise ValueError("supported file extensions are .parquet and .csv")
-                if "time" in frame.columns:
-                    time = pd.to_datetime(frame.pop("time"), utc=True, format="mixed")
-                    frame.index = pd.DatetimeIndex(time, name="time")
-                elif not isinstance(frame.index, pd.DatetimeIndex):
-                    raise ValueError("table requires a datetime index or a time column")
-                datasets[name][kind] = frame
-            except (OSError, ValueError, TypeError, ImportError) as exc:
-                raise RuntimeError(f"Cannot load {name} {kind} from {path}: {exc}") from exc
-    return datasets
-
-
 def _run_constellation(args: argparse.Namespace) -> int:
     if (args.start is None) != (args.end is None):
         raise RuntimeError("Supply --start and --end together, or omit both.")
@@ -240,6 +195,41 @@ def _run_constellation(args: argparse.Namespace) -> int:
     if args.pdf:
         print(f"Wrote: {output.with_suffix('.pdf')}")
     return 0
+
+
+def _run_shock(args: argparse.Namespace) -> int:
+    from l1obs.analysis.shocks.pipeline import run_event
+    try:
+        report = run_event(args.event, operation=args.shock_operation, manifest=args.manifest,
+                           outdir=args.outdir, spacecraft=getattr(args, "spacecraft", None),
+                           zoom_s=args.zoom_seconds, relative=not args.no_relative)
+    except (ValueError, TypeError, OSError, RuntimeError) as exc:
+        raise RuntimeError(f"Shock {args.shock_operation} failed: {exc}") from exc
+    if "fit" in report:
+        fit = report["fit"]
+        print(f"Speed: {fit['speed_km_s']:.6g} km/s; propagation normal GSE: {fit['normal_gse']}")
+        for flag in fit["flags"]:
+            print(f"Flag: {flag}")
+        mc = report.get("monte_carlo")
+        if mc is not None:
+            if "speed_median_km_s" in mc:
+                print(f"Monte Carlo median: {mc['speed_median_km_s']:.6g} km/s; "
+                      f"68% interval: {mc['speed_interval_68_km_s']}; "
+                      f"95% angular radius: {mc['angular_radius_95_deg']:.4g} deg")
+            for flag in mc["flags"]:
+                print(f"Flag: {flag}")
+    from l1obs.analysis.shocks.event import load_event
+    output = args.outdir if args.outdir is not None else load_event(args.event).output_dir
+    print(f"Status: {report['status']}; outputs: {output}")
+    return 0
+
+
+def _positive_seconds(value: str) -> float:
+    try:
+        from l1obs.analysis.shocks.event import positive
+        return positive(value, "seconds")
+    except (ValueError, TypeError) as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -314,7 +304,23 @@ def _build_parser() -> argparse.ArgumentParser:
     constellation.add_argument("--position-max-gap", type=_positive_gap, help="Position gap limit, e.g. 5min.")
     constellation.set_defaults(handler=_run_constellation)
 
-    for subparser in (timeseries, positions, constellation):
+    shock = subparsers.add_parser("shock", help="Inspect native data or fit explicitly accepted shock arrivals.")
+    stages = shock.add_subparsers(dest="shock_operation", required=True)
+    for operation in ("inspect", "fit"):
+        stage = stages.add_parser(operation)
+        stage.add_argument("--event", type=Path, required=True, help="Shock event JSON.")
+        stage.add_argument("--manifest", type=Path, help="Override local constellation manifest.")
+        stage.add_argument("--outdir", type=Path, help="Override event output directory.")
+        stage.add_argument("--zoom-seconds", type=_positive_seconds, default=120,
+                           help="Half-width of each crossing zoom (default 120 s).")
+        stage.add_argument("--no-relative", action="store_true", help="Omit the relative-crossing-time view.")
+        if operation == "fit":
+            stage.add_argument("--spacecraft", nargs="+", help="Explicit subset of at least four event spacecraft.")
+        stage.add_argument("-v", "--verbose", action="store_true", default=argparse.SUPPRESS)
+        stage.add_argument("-vv", action="store_true", default=argparse.SUPPRESS)
+        stage.set_defaults(handler=_run_shock)
+
+    for subparser in (timeseries, positions, constellation, shock):
         subparser.add_argument(
             "-v", "--verbose", action="store_true", help="Print progress."
         )
